@@ -43,7 +43,7 @@ create_cluster = DataprocClusterCreateOperator(
     master_disk_size=100,
     image_version='2.2-debian12',
     properties={
-        'dataproc:pip.packages': 'datasets==3.0.0'
+        'dataproc:pip.packages': 'datasets==3.0.0,hnswlib==0.8.0'
     },
     dag=dag
 )
@@ -53,19 +53,34 @@ job_args = [
     {
         'task_id': 'artist_popularity_generation',
         'main': f'gs://{MAINFILE_BUCKET}/spotify-track-recommender/artist_popularity_generation.py',
-        'arguments': [f'--gcs_output_folder=gs://{SPOTIFY_RECOMMENDER_BUCKET}/artist_popularity_generation/']
+        'arguments': [f'--gcs_output_folder=gs://{SPOTIFY_RECOMMENDER_BUCKET}/spotify_track_recommender/artist_popularity_generation/']
     },
     {
         'task_id': 'genre_popularity_generation',
         'main': f'gs://{MAINFILE_BUCKET}/spotify-track-recommender/genre_popularity_generation.py',
-        'arguments': [f'--gcs_output_folder=gs://{SPOTIFY_RECOMMENDER_BUCKET}/genre_popularity_generation/']
+        'arguments': [f'--gcs_output_folder=gs://{SPOTIFY_RECOMMENDER_BUCKET}/spotify_track_recommender/genre_popularity_generation/']
+    },
+    {
+        'task_id': 'embedding_generation',
+        'main': f'gs://{MAINFILE_BUCKET}/spotify-track-recommender/embedding_generation.py',
+        'arguments': [f'--gcs_output_folder=gs://{SPOTIFY_RECOMMENDER_BUCKET}/spotify_track_recommender/embedding_generation/']
+    },
+    {
+        'task_id': 'build_index',
+        'main': f'gs://{MAINFILE_BUCKET}/spotify-track-recommender/build_index.py',
+        'arguments': [
+            f'--gcs_input_folder=gs://{SPOTIFY_RECOMMENDER_BUCKET}/spotify_track_recommender/embedding_generation/',
+            f'--gcs_output_bucket={SPOTIFY_RECOMMENDER_BUCKET}',
+            f'--gcs_output_blob=spotify_track_recommender/index'
+        ]
     },
     {
         'task_id': 'enrich_dataset_aggregation',
-        'main': f'gs://{MAINFILE_BUCKET}/spotify-track-recommender/jobs/enrich_dataset_aggregation.py',
+        'main': f'gs://{MAINFILE_BUCKET}/spotify-track-recommender/enrich_dataset_aggregation.py',
         'arguments': [
             f'--artist_popularity_gcs_input_folder=gs://{SPOTIFY_RECOMMENDER_BUCKET}/artist_popularity_generation/',
             f'--genre_popularity_gcs_input_folder=gs://{SPOTIFY_RECOMMENDER_BUCKET}/genre_popularity_generation/',
+            f'--embedding_gcs_input_folder=gs://{SPOTIFY_RECOMMENDER_BUCKET}/spotify_track_recommender/embedding_generation/',
             f'--gcs_output_folder=gs://{SPOTIFY_RECOMMENDER_BUCKET}/enrich_dataset/'
         ]
     }
