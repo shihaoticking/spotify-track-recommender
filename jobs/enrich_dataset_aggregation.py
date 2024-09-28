@@ -37,8 +37,9 @@ if __name__ == '__main__':
     df = df.join(embedding, on=['track_id'], how='left')
 
     group_keys = ['track_id', 'artists', 'album_name', 'track_name',
-                  'popularity', 'artist_popularity', 'embedding']
+                  'artist_popularity', 'embedding']
     df = df.groupBy(*group_keys).agg(
+        mean('popularity').alias('popularity'),
         mean('genre_popularity').alias('genre_popularity'),
         collect_set('track_genre').alias('track_genres')
     )
