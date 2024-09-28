@@ -26,6 +26,9 @@ if __name__ == '__main__':
 
     df = data_loader.load_pyspark_df(spark)
 
+    # Drop duplicates
+    df = df.dropDuplicates(subset=['track_id'])
+
     # Convert boolean 'explicit' column to numeric
     df = df.withColumn('explicit', when(col('explicit'), 1).otherwise(0))
 

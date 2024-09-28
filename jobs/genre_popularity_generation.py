@@ -2,8 +2,8 @@ from argparse import ArgumentParser
 
 import pyspark.sql.functions as f
 
-from src.utils.spark_utils import initial_spark
 from src.utils.data_loader import DataLoader
+from src.utils.spark_utils import initial_spark
 
 APP_NAME = 'genre_popularity_generation'
 
@@ -18,6 +18,8 @@ if __name__ == '__main__':
     data_loader = DataLoader()
 
     df = data_loader.load_pyspark_df(spark)
+
+    df = df.dropDuplicates(subset=['track_id', 'track_genre'])
 
     genre_popularity = df.groupBy('track_genre').agg(f.mean('popularity').alias('genre_popularity'))
     genre_popularity.show(10)
