@@ -1,0 +1,5 @@
+hnswlib==0.8.0
+gcsfs==2024.9.0.post1
+fastapi[standard]==0.115.0
+pandas==2.2.3
+numpy==1.26.4
