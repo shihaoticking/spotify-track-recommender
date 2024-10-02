@@ -3,3 +3,4 @@ gcsfs==2024.9.0.post1
 fastapi[standard]==0.115.0
 pandas==2.2.3
 numpy==1.26.4
+pyarrow==17.0.0
