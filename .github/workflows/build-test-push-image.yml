@@ -1,0 +1,63 @@
+name: Build, Test, and Push Image
+
+on:
+  push:
+    branches: '*'
+
+env:
+  APP_NAME: spotitfy-track-recommender
+  GCP_REGION: us-west1
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+
+    - name: Build Docker image
+      uses: docker/build-push-action@v5
+      with:
+        context: .
+        file: ./Dockerfile
+        target: test
+        tags: ${{ env.APP_NAME }}-test:${{ github.ref_name }}-${{ github.sha }}
+        load: true
+
+    - name: Run test
+      run: docker run --rm ${{ env.APP_NAME }}-test:${{ github.ref_name }}-${{ github.sha }}
+
+  push-to-registry:
+    needs: build-and-test
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+
+    - name: Authenticate to Google Cloud
+      uses: google-github-actions/auth@v1
+      with:
+        create_credentials_file: true
+        workload_identity_provider: ${{ secrets.WORKLOAD_IDENTITY_PROVIDER }}
+        service_account: ${{ secrets.SERVICE_ACCOUNT_EMAIL }}
+        
+    - name: Authenticate to Google Cloud Artifact Registry
+      run: gcloud auth configure-docker ${{ env.GCP_REGION }}-docker.pkg.dev
+
+    - name: Build and push Docker image
+      uses: docker/build-push-action@v5
+      with:
+        context: .
+        file: ./Dockerfile
+        target: prod
+        push: true
+        tags: |
+          ${{ secrets.GCP_ARTIFACT_REGISTRY_CONTAINER }}/${{ env.APP_NAME }}:${{ github.sha }}
+          ${{ secrets.GCP_ARTIFACT_REGISTRY_CONTAINER }}/${{ env.APP_NAME }}:latest

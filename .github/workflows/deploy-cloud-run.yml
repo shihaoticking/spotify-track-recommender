@@ -1,0 +1,36 @@
+name: Deploy to Google Cloud Run
+
+on:
+  workflow_dispatch:
+
+env:
+  APP_NAME: spotitfy-track-recommender
+  GCP_REGION: us-west1
+
+permissions:
+  id-token: write
+
+jobs:
+  deploy-to-cloud-run:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: 'Authenticate to Google Cloud'
+      uses: 'google-gitHub-actions/auth@v1'
+      with:
+        create_credentials_file: true
+        workload_identity_provider: ${{ secrets.WORKLOAD_IDENTITY_PROVIDER }}
+        service_account: ${{ secrets.SERVICE_ACCOUNT_EMAIL }}
+
+    - name: Deploy to Google Cloud Run
+      run: |
+        gcloud run deploy ${{ env.APP_NAME }} \
+          --image ${{ secrets.GCP_ARTIFACT_REGISTRY_CONTAINER }}/${{ env.APP_NAME }}:latest \
+          --platform managed \
+          --region ${{ env.GCP_REGION }} \
+          --allow-unauthenticated \
+          --port 8080 \
+          --service-account ${{ secrets.SERVICE_ACCOUNT_EMAIL }} \
+          --set-env-vars "TRACK_IDS_FILE=${{ secrets.SPOTIFY_RECOMMENDER_BUCKET }}/index/track_ids.json" \
+          --set-env-vars "INDEX_FILE=${{ secrets.SPOTIFY_RECOMMENDER_BUCKET }}/index/hnsw_index.bin" \
+          --set-env-vars "DATASET_FOLDER=${{ secrets.SPOTIFY_RECOMMENDER_BUCKET }}/enrich_dataset"
