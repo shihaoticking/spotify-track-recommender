@@ -5,12 +5,21 @@ on:
     branches: '*'
   pull_request:
     branches: [ "main" ]
+  workflow_dispatch:
+    inputs:
+      deploy:
+        description: 'Deploy to Google Cloud Run'
+        required: true
+        default: 'false'
 
 env:
-    APP_NAME: spotitfy-track-recommender
+  APP_NAME: spotitfy-track-recommender
+  GCP_REGION: us-west1
 
 permissions:
   contents: read
+  packages: write
+  id-token: write
 
 jobs:
   build-and-test:
@@ -34,3 +43,60 @@ jobs:
 
     - name: Run test
       run: docker run --rm ${{ env.APP_NAME }}-test:${{ github.ref_name }}-${{ github.sha }}
+
+  push-to-registry:
+    needs: build-and-test
+    runs-on: ubuntu-latest
+    if: github.event.pull_request.merged == true && github.ref == 'refs/heads/main'
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+
+    - name: Authenticate to Google Cloud
+      uses: google-gitHub-actions/auth@v1
+      with:
+        create_credentials_file: true
+        workload_identity_provider: ${{ secrets.WORKLOAD_IDENTITY_PROVIDER }}
+        service_account: ${{ secrets.SERVICE_ACCOUNT_EMAIL }}
+        
+    - name: Authenticate to Google Cloud Artifact Registry
+      run: gcloud auth configure-docker ${{ env.GCP_REGION }}-docker.pkg.dev
+
+    - name: Build and push Docker image
+      uses: docker/build-push-action@v5
+      with:
+        context: .
+        file: ./Dockerfile
+        target: prod
+        push: true
+        tags: ${{ secrets.GCP_ARTIFACT_REGISTRY_CONTAINER }}/${{ env.APP_NAME }}:latest
+
+  deploy-to-cloud-run:
+    needs: push-to-registry
+    runs-on: ubuntu-latest
+    if: github.event_name == 'workflow_dispatch' && github.event.inputs.deploy == 'true'
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+
+    - name: 'Authenticate to Google Cloud'
+      uses: 'google-gitHub-actions/auth@v1'
+      with:
+        create_credentials_file: true
+        workload_identity_provider: ${{ secrets.WORKLOAD_IDENTITY_PROVIDER }}
+        service_account: ${{ secrets.SERVICE_ACCOUNT_EMAIL }}
+
+    - name: Deploy to Google Cloud Run
+      run: |
+        gcloud run deploy ${{ env.APP_NAME }} \
+          --image ${{ secrets.GCP_ARTIFACT_REGISTRY_CONTAINER }}/${{ env.APP_NAME }}:latest \
+          --platform managed \
+          --region us-west1 \
+          --allow-unauthenticated \
+          --port 8080 \
+          --service-account ${{ secrets.SERVICE_ACCOUNT_EMAIL }} \
+          --set-env-vars "TRACK_IDS_FILE=${{ secrets.SPOTIFY_RECOMMENDER_BUCKET }}/index/track_ids.json" \
+          --set-env-vars "INDEX_FILE=${{ secrets.SPOTIFY_RECOMMENDER_BUCKET }}/index/hnsw_index.bin" \
+          --set-env-vars "DATASET_FOLDER=${{ secrets.SPOTIFY_RECOMMENDER_BUCKET }}/enrich_dataset"
