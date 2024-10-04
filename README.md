@@ -22,6 +22,8 @@ This project demonstrates a robust, end-to-end machine learning pipeline for rec
 1. **Recommendation Model**: A machine learning model utilizes the processed data and HNSW index to generate personalized track recommendations.
 1. **API Layer**: A FastAPI application serves the recommendation model, providing a RESTful interface for client applications.
 
+![Spotify Track Recommender Infrastructure](assets/infra.png)
+
 ## Repository Structure
 
 ```
