@@ -1,3 +1,2 @@
 datasets==3.0.0
 hnswlib==0.8.0
-pyspark~=3.5.0
